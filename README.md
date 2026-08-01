@@ -9,6 +9,7 @@ projects entirely from a phone or tablet.
 |---|---|---|
 | **File Explorer** | `lib/screens/file_explorer_screen.dart` | Browse/create/rename/delete files & folders inside a project's `game/` tree; opens `.rpy`/`.txt`/`.json` in a raw text editor. |
 | **Dialogue Editor** | `lib/screens/dialogue_editor_screen.dart` | Block-based visual editor — Say, Narration, Scene/Show, Menu, Label, Jump, Comment blocks — reorderable, per-script-file tabs, with a live "View Raw" toggle showing compiled Ren'Py syntax. |
+| **Character Manager** | `lib/screens/character_manager_screen.dart` | List/add/edit/delete a project's `Character` defines — display name, variable name, image tag, and text color (hex) — each change saved via `ProjectService.updateProject()`. |
 | **AI Assistant** | `lib/screens/ai_assistant_screen.dart` | Chat interface backed by the Anthropic Messages API (BYO API key, stored locally) with the project's characters/scripts fed in as context. |
 | **Image Importer** | `lib/screens/image_importer_screen.dart` | Pull images from gallery or camera, rename to Ren'Py tag convention, copy into `game/images/`. |
 | **Export** | `lib/screens/export_screen.dart` | Materializes a launcher-ready Ren'Py folder (`game/script.rpy`, `options.rpy`, `screens.rpy`, `images/`, `audio/`, `gui/`) and zips it for sharing. |
