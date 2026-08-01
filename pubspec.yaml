@@ -1,0 +1,51 @@
+name: renpy_studio_mobile
+description: A mobile IDE for building Ren'Py visual novel projects.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # State management
+  provider: ^6.1.2
+
+  # File system / storage
+  path_provider: ^2.1.3
+  path: ^1.9.0
+  file_picker: ^8.0.0+1
+  permission_handler: ^11.3.1
+
+  # Images
+  image_picker: ^1.1.2
+
+  # Code editor / syntax highlighting for the dialogue editor
+  flutter_highlight: ^0.7.0
+  highlight: ^0.7.0
+
+  # Export as .zip Ren'Py-compatible project
+  archive: ^3.6.1
+  share_plus: ^10.0.2
+
+  # Networking for the AI assistant (BYO API key)
+  http: ^1.2.1
+
+  # Local persistence (project list, settings, API key)
+  shared_preferences: ^2.2.3
+
+  # Nice UUIDs for scenes/characters
+  uuid: ^4.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
