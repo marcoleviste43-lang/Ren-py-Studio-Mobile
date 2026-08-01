@@ -12,6 +12,7 @@ projects entirely from a phone or tablet.
 | **Character Manager** | `lib/screens/character_manager_screen.dart` | List/add/edit/delete a project's `Character` defines — display name, variable name, image tag, and text color (hex) — each change saved via `ProjectService.updateProject()`. |
 | **AI Assistant** | `lib/screens/ai_assistant_screen.dart` | Chat interface backed by the Anthropic Messages API (BYO API key, stored locally) with the project's characters/scripts fed in as context. |
 | **Image Importer** | `lib/screens/image_importer_screen.dart` | Pull images from gallery or camera, rename to Ren'Py tag convention, copy into `game/images/`. |
+| **Preview** | `lib/screens/preview_screen.dart` | Live, syntax-highlighted view of the full generated Ren'Py script (all characters + script files combined), via `RenPyGenerator`. Rebuilds instantly on any change elsewhere; supports copy-to-clipboard and export as a standalone `.rpy`. |
 | **Export** | `lib/screens/export_screen.dart` | Materializes a launcher-ready Ren'Py folder (`game/script.rpy`, `options.rpy`, `screens.rpy`, `images/`, `audio/`, `gui/`) and zips it for sharing. |
 
 ## Project structure
@@ -28,6 +29,7 @@ lib/
   services/
     project_service.dart        # CRUD + on-disk folder skeleton + persistence
     file_explorer_service.dart  # dart:io wrapper for browsing/editing files
+    renpy_generator.dart        # single source of truth: project -> Ren'Py source text
     renpy_export_service.dart   # materialize + zip a full Ren'Py project
     ai_service.dart             # Anthropic API client, chat history
     image_import_service.dart   # image_picker wrapper + tag-name guessing
@@ -44,6 +46,14 @@ Ren'Py text with correct indentation. This lets the visual editor guarantee
 valid output while still letting power users drop into a raw text editor
 (`rawOverride` on `ScriptFile`, or editing the file directly via the File
 Explorer) whenever they want full control.
+
+`RenPyGenerator` (`lib/services/renpy_generator.dart`) sits one layer up:
+it's the only place that combines character `define` statements with
+compiled script bodies into project-wide output. `ProjectService` (on-device
+sync), `RenPyExportService` (`.zip`/`.rpy` export), and the **Preview** tab
+all call into it rather than re-deriving "defines + compiled scripts"
+themselves — so there's exactly one implementation of "what does this
+project's Ren'Py source look like" to keep correct.
 
 ## Setup
 

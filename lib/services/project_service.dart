@@ -9,6 +9,7 @@ import '../models/renpy_project.dart';
 import '../models/character.dart';
 import '../models/script_file.dart';
 import '../models/dialogue_line.dart';
+import 'renpy_generator.dart';
 
 const _uuid = Uuid();
 
@@ -128,19 +129,17 @@ class ProjectService extends ChangeNotifier {
     notifyListeners();
   }
 
+  final _generator = RenPyGenerator();
+
   /// Writes every script file's compiled contents to disk under game/.
   Future<void> saveScriptsToDisk(RenPyProject project) async {
     final gameDir = Directory(p.join(project.directoryPath, 'game'));
     if (!await gameDir.exists()) await gameDir.create(recursive: true);
 
-    final defines = project.characters.map((c) => c.toRenPyDefine()).join('\n');
-
-    for (final script in project.scripts) {
-      final file = File(p.join(gameDir.path, script.fileName));
-      final content = script.fileName == project.scripts.first.fileName
-          ? '$defines\n\n${script.compile()}'
-          : script.compile();
-      await file.writeAsString(content);
+    final files = _generator.generateAllFiles(project);
+    for (final entry in files.entries) {
+      final file = File(p.join(gameDir.path, entry.key));
+      await file.writeAsString(entry.value);
     }
     await updateProject(project);
   }
