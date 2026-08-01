@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import '../models/renpy_project.dart';
 import 'file_explorer_screen.dart';
 import 'dialogue_editor_screen.dart';
+import 'character_manager_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'image_importer_screen.dart';
 import 'export_screen.dart';
 
-/// Hosts the five core features as tabs: File Explorer, Dialogue Editor,
-/// AI Assistant, Image Importer, and Export.
+/// Hosts the six core features as tabs: File Explorer, Dialogue Editor,
+/// Character Manager, AI Assistant, Image Importer, and Export.
 class ProjectWorkspaceScreen extends StatefulWidget {
   final RenPyProject project;
   const ProjectWorkspaceScreen({super.key, required this.project});
@@ -24,6 +25,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
   late final List<Widget> _tabs = [
     FileExplorerScreen(project: widget.project),
     DialogueEditorScreen(project: widget.project),
+    CharacterManagerScreen(project: widget.project),
     AiAssistantScreen(project: widget.project),
     ImageImporterScreen(project: widget.project),
     ExportScreen(project: widget.project),
@@ -46,6 +48,10 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               icon: Icon(Icons.chat_bubble_outline),
               selectedIcon: Icon(Icons.chat_bubble),
               label: 'Dialogue'),
+          NavigationDestination(
+              icon: Icon(Icons.groups_outlined),
+              selectedIcon: Icon(Icons.groups),
+              label: 'Characters'),
           NavigationDestination(
               icon: Icon(Icons.auto_awesome_outlined),
               selectedIcon: Icon(Icons.auto_awesome),
