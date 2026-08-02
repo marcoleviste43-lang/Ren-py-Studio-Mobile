@@ -7,6 +7,7 @@ projects entirely from a phone or tablet.
 
 | Feature | Where | What it does |
 |---|---|---|
+| **Project Manager** | `lib/screens/home_screen.dart` | Landing screen — create, list, and delete projects; each card shows script/character counts and opens into `ProjectWorkspaceScreen`. |
 | **File Explorer** | `lib/screens/file_explorer_screen.dart` | Browse/create/rename/delete files & folders inside a project's `game/` tree; opens `.rpy`/`.txt`/`.json` in a raw text editor. |
 | **Dialogue Editor** | `lib/screens/dialogue_editor_screen.dart` | Block-based visual editor — Say, Narration, Scene/Show, Menu, Label, Jump, Comment blocks — reorderable, per-script-file tabs, with a live "View Raw" toggle showing compiled Ren'Py syntax. |
 | **Character Manager** | `lib/screens/character_manager_screen.dart` | List/add/edit/delete a project's `Character` defines — display name, variable name, image tag, and text color (hex) — each change saved via `ProjectService.updateProject()`. |
@@ -61,6 +62,20 @@ project's Ren'Py source look like" to keep correct.
 flutter pub get
 flutter run          # device/emulator of your choice
 ```
+
+### Dev container
+
+`.devcontainer/devcontainer.json` runs the `ghcr.io/cirruslabs/flutter:stable`
+image, so the repo can be opened directly in a GitHub Codespace (or any
+devcontainer-compatible editor) with Flutter preinstalled — no local SDK
+setup needed.
+
+### CI build
+
+`.github/workflows/` builds a release APK on every push to `main` (and on
+manual dispatch): sets up Java 17 + Flutter 3.32.8, runs `flutter pub get`,
+then `flutter build apk --release` and uploads the APK as a workflow
+artifact (`RenPyStudio-Mobile`).
 
 ### AI Assistant
 
