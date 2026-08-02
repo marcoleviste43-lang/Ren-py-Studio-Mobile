@@ -55,8 +55,22 @@ class RuntimeCompiler {
       for (final line in script.lines) {
         switch (line.kind) {
           case DialogueKind.label:
-            _addLabel(line.text.trim(), script.fileName, instructions.length,
-                labelIndex, errors);
+            final name = line.text.trim();
+            if (name.isEmpty) {
+              errors.add("Empty label name in '${script.fileName}'.");
+              break;
+            }
+            if (labelIndex.containsKey(name)) {
+              errors.add(
+                  "Duplicate label '$name' (seen again in '${script.fileName}').");
+              break;
+            }
+            // Mirrors ScriptFile.compile()'s auto-`return`: without
+            // this, a label with no explicit jump would silently fall
+            // through into whatever label happens to sit next in this
+            // flat instruction list -- the exact bug being fixed here.
+            _closeLabelIfUnterminated(instructions);
+            labelIndex[name] = instructions.length;
             break;
 
           case DialogueKind.say:
@@ -137,21 +151,32 @@ class RuntimeCompiler {
     );
   }
 
-  void _addLabel(
-    String name,
-    String fileName,
-    int position,
-    Map<String, int> labelIndex,
-    List<String> errors,
-  ) {
-    if (name.isEmpty) {
-      errors.add("Empty label name in '$fileName'.");
-      return;
-    }
-    if (labelIndex.containsKey(name)) {
-      errors.add("Duplicate label '$name' (seen again in '$fileName').");
-      return;
-    }
-    labelIndex[name] = position;
+  /// If the label currently being built ended without an explicit
+  /// [JumpInstruction] or an all-jump [MenuInstruction] (verified
+  /// against the actual choice data by [_menuAlwaysJumps], not assumed
+  /// from the instruction's type alone), it would otherwise fall
+  /// through into the next label added to [instructions]. Insert an
+  /// [EndInstruction] as a safety net -- equivalent to Ren'Py's
+  /// implicit `return` at a label with no caller.
+  void _closeLabelIfUnterminated(List<VnInstruction> instructions) {
+    if (instructions.isEmpty) return;
+    final last = instructions.last;
+    if (last is EndInstruction) return;
+    if (last is JumpInstruction) return;
+    if (last is MenuInstruction && _menuAlwaysJumps(last)) return;
+    instructions.add(const EndInstruction());
+  }
+
+  /// Mirrors `ScriptFile._menuAlwaysJumps`: a menu only counts as
+  /// guaranteeing hand-off if every choice actually has a non-blank
+  /// target. A blank `targetLabel` (reachable today by clearing the
+  /// jump-target field in the dialogue editor) would otherwise be
+  /// treated as "safe" here and then surface only as a separate
+  /// "undefined label ''" error below -- checking the real data keeps
+  /// this method's own guarantee honest regardless of what else does
+  /// or doesn't catch it downstream.
+  bool _menuAlwaysJumps(MenuInstruction menu) {
+    if (menu.choices.isEmpty) return false;
+    return menu.choices.every((c) => c.targetLabel.trim().isNotEmpty);
   }
 }
