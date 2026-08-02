@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/renpy_project.dart';
+import '../services/ai/ai_provider.dart';
 import '../services/ai_service.dart';
 
 class AiAssistantScreen extends StatefulWidget {
@@ -19,15 +20,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   Future<void> _openApiKeyDialog() async {
     final ai = context.read<AiService>();
-    final controller = TextEditingController(text: ai.apiKey ?? '');
+    final provider = ai.availableProviders
+        .firstWhere((p) => p.id == ai.selectedProvider);
+    final controller = TextEditingController(text: provider.apiKey ?? '');
     final key = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Anthropic API Key'),
+        title: Text('${provider.displayName} API Key'),
         content: TextField(
           controller: controller,
           obscureText: true,
-          decoration: const InputDecoration(hintText: 'sk-ant-...'),
+          decoration: InputDecoration(hintText: provider.apiKeyHint),
         ),
         actions: [
           TextButton(
@@ -40,7 +43,40 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       ),
     );
     if (key != null && key.isNotEmpty) {
-      await ai.setApiKey(key);
+      await ai.setApiKeyFor(ai.selectedProvider, key);
+    }
+  }
+
+  Future<void> _openProviderPicker() async {
+    final ai = context.read<AiService>();
+    final choice = await showDialog<AiProviderId>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('AI Provider'),
+        children: ai.availableProviders
+            .map((p) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, p.id),
+                  child: Row(
+                    children: [
+                      Icon(
+                        p.id == ai.selectedProvider
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(p.displayName),
+                    ],
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+    if (choice != null && choice != ai.selectedProvider) {
+      await ai.setProvider(choice);
+      if (!ai.isConfigured) {
+        await _openApiKeyDialog();
+      }
     }
   }
 
@@ -94,6 +130,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         automaticallyImplyLeading: false,
         title: const Text('AI Assistant'),
         actions: [
+          TextButton.icon(
+            onPressed: _openProviderPicker,
+            icon: const Icon(Icons.smart_toy_outlined, size: 18),
+            label: Text(ai.availableProviders
+                .firstWhere((p) => p.id == ai.selectedProvider)
+                .displayName),
+          ),
           IconButton(
             icon: const Icon(Icons.vpn_key_outlined),
             tooltip: 'API Key',
@@ -117,10 +160,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 children: [
                   const Icon(Icons.info_outline, size: 18),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Add your Anthropic API key to enable the assistant.',
-                      style: TextStyle(fontSize: 12.5),
+                      'Add your ${ai.availableProviders.firstWhere((p) => p.id == ai.selectedProvider).displayName} '
+                      'API key to enable the assistant.',
+                      style: const TextStyle(fontSize: 12.5),
                     ),
                   ),
                   TextButton(
