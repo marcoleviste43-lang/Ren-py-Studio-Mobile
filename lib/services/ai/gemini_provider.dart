@@ -7,7 +7,7 @@ import 'ai_provider.dart';
 class GeminiProvider implements AiProvider {
   GeminiProvider(this.apiKey);
 
-  static const _model = 'gemini-2.5-flash';
+  static const _model = 'gemini-3.5-flash';
   static const _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
 
