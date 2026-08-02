@@ -22,6 +22,9 @@ class GeminiProvider implements AiProvider {
 
   @override
   String get apiKeyHint => 'AIza...';
+  
+  @override
+bool get isConfigured => apiKey != null && apiKey!.isNotEmpty;
 
   @override
   Future<String> send({

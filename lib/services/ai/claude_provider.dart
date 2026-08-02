@@ -23,6 +23,9 @@ class ClaudeProvider implements AiProvider {
   @override
   String get apiKeyHint => 'sk-ant-...';
 
+@override
+bool get isConfigured => apiKey != null && apiKey!.isNotEmpty;
+
   @override
   Future<String> send({
     required String apiKey,
