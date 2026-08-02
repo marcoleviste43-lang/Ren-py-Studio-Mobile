@@ -11,6 +11,7 @@ import '../models/renpy_project.dart';
 import '../services/project_service.dart';
 import '../services/renpy_generator.dart';
 import '../services/renpy_export_service.dart';
+import '../runtime/player_screen.dart';
 
 bool _renpyLanguageRegistered = false;
 
@@ -92,6 +93,18 @@ class _PreviewScreenState extends State<PreviewScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Preview'),
         actions: [
+          IconButton(
+            tooltip: 'Play',
+            icon: const Icon(Icons.play_arrow_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PlayerScreen(project: widget.project),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Copy script',
             icon: const Icon(Icons.copy_outlined),
