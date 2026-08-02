@@ -112,6 +112,46 @@ class _DialogueEditorScreenState extends State<DialogueEditorScreen> {
     _persist();
   }
 
+  /// Writes edited raw text back into the model. This is the only path
+  /// that sets `rawOverride` -- once set, `ScriptFile.isRawMode` is true
+  /// and this file's `lines` are considered stale until the raw edits
+  /// are explicitly discarded (there's no parser to reconcile the two).
+  void _saveRawOverride(String text) {
+    _script.rawOverride = text;
+    _persist();
+  }
+
+  /// Drops the raw override and falls back to whatever `lines` still
+  /// holds, returning the file to Visual Mode. This does not parse the
+  /// raw text -- it discards it -- so it's only offered with an explicit
+  /// confirmation.
+  Future<void> _discardRawMode() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard raw edits?'),
+        content: const Text(
+          'This switches the file back to Visual Mode using the blocks '
+          'from before it was last hand-edited. The raw text you typed '
+          'will be discarded -- this can\'t be undone.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _script.rawOverride = null);
+    _persist();
+  }
+
   void _addCharacter() async {
     final nameCtrl = TextEditingController();
     final varCtrl = TextEditingController();
@@ -202,37 +242,62 @@ class _DialogueEditorScreenState extends State<DialogueEditorScreen> {
           onAdd: _addCharacter,
         ),
         const Divider(height: 1),
-        // Toolbar to insert new blocks
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Wrap(
-            spacing: 6,
-            children: [
-              _AddButton(label: 'Say', icon: Icons.chat_bubble_outline,
-                  onTap: () => _addLine(DialogueKind.say)),
-              _AddButton(label: 'Narration', icon: Icons.short_text,
-                  onTap: () => _addLine(DialogueKind.narration)),
-              _AddButton(label: 'Scene/Show', icon: Icons.landscape_outlined,
-                  onTap: () => _addLine(DialogueKind.sceneShow)),
-              _AddButton(label: 'Menu', icon: Icons.list_alt_outlined,
-                  onTap: () => _addLine(DialogueKind.menuChoice)),
-              _AddButton(label: 'Label', icon: Icons.label_outline,
-                  onTap: () => _addLine(DialogueKind.label)),
-              _AddButton(label: 'Jump', icon: Icons.arrow_forward,
-                  onTap: () => _addLine(DialogueKind.jump)),
-              _AddButton(label: 'Comment', icon: Icons.comment_outlined,
-                  onTap: () => _addLine(DialogueKind.comment)),
-              IconButton(
-                tooltip: 'View compiled Ren\'Py',
-                icon: Icon(_showRaw ? Icons.edit_note : Icons.code),
-                onPressed: () => setState(() => _showRaw = !_showRaw),
-              ),
-            ],
+        if (_script.isRawMode) _RawModeBanner(onDiscard: _discardRawMode),
+        // Toolbar to insert new blocks -- hidden in Raw Mode, since
+        // `lines` is stale there and adding blocks wouldn't affect the
+        // compiled output (`rawOverride` always wins).
+        if (!_script.isRawMode)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Wrap(
+              spacing: 6,
+              children: [
+                _AddButton(label: 'Say', icon: Icons.chat_bubble_outline,
+                    onTap: () => _addLine(DialogueKind.say)),
+                _AddButton(label: 'Narration', icon: Icons.short_text,
+                    onTap: () => _addLine(DialogueKind.narration)),
+                _AddButton(label: 'Scene/Show', icon: Icons.landscape_outlined,
+                    onTap: () => _addLine(DialogueKind.sceneShow)),
+                _AddButton(label: 'Menu', icon: Icons.list_alt_outlined,
+                    onTap: () => _addLine(DialogueKind.menuChoice)),
+                _AddButton(label: 'Label', icon: Icons.label_outline,
+                    onTap: () => _addLine(DialogueKind.label)),
+                _AddButton(label: 'Jump', icon: Icons.arrow_forward,
+                    onTap: () => _addLine(DialogueKind.jump)),
+                _AddButton(label: 'Comment', icon: Icons.comment_outlined,
+                    onTap: () => _addLine(DialogueKind.comment)),
+                IconButton(
+                  tooltip: 'Edit raw Ren\'Py',
+                  icon: Icon(_showRaw ? Icons.edit_note : Icons.code),
+                  onPressed: () => setState(() => _showRaw = !_showRaw),
+                ),
+              ],
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              children: [
+                Text('RAW MODE',
+                    style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.withOpacity(0.9))),
+                const Spacer(),
+              ],
+            ),
           ),
-        ),
         const Divider(height: 1),
         Expanded(
-          child: _showRaw ? _RawPreview(script: _script) : _buildLineList(),
+          child: (_showRaw || _script.isRawMode)
+              ? _RawEditor(
+                  key: ValueKey(_script.id),
+                  script: _script,
+                  onSave: _saveRawOverride,
+                )
+              : _buildLineList(),
         ),
       ],
     );
@@ -263,22 +328,147 @@ class _DialogueEditorScreenState extends State<DialogueEditorScreen> {
   }
 }
 
-class _RawPreview extends StatelessWidget {
+/// Editable code editor for a `ScriptFile`'s raw Ren'Py text. Replaces
+/// the old read-only preview: edits are held locally until the user taps
+/// Save, at which point [onSave] writes the *exact* text typed --
+/// nothing here reformats, trims, or reflows it -- into `rawOverride`.
+///
+/// Keyed by the script's id from the caller so switching file tabs
+/// tears down and rebuilds this widget's state, re-seeding the
+/// controller from that file's current text instead of carrying over
+/// another file's edits.
+class _RawEditor extends StatefulWidget {
   final ScriptFile script;
-  const _RawPreview({required this.script});
+  final ValueChanged<String> onSave;
+  const _RawEditor({super.key, required this.script, required this.onSave});
+
+  @override
+  State<_RawEditor> createState() => _RawEditorState();
+}
+
+class _RawEditorState extends State<_RawEditor> {
+  late final TextEditingController _controller;
+  bool _dirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Seed from rawOverride if this file is already in Raw Mode;
+    // otherwise from the compiled output of the current blocks, so the
+    // very first edit starts from exactly what the user was just
+    // looking at.
+    _controller = TextEditingController(
+        text: widget.script.rawOverride ?? widget.script.compile());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    widget.onSave(_controller.text);
+    setState(() => _dirty = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          color: const Color(0xFF16161D),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              Icon(Icons.code, size: 16, color: Colors.white.withOpacity(0.5)),
+              const SizedBox(width: 6),
+              Text(
+                widget.script.fileName,
+                style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.6)),
+              ),
+              const Spacer(),
+              if (_dirty)
+                FilledButton.tonalIcon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.save_outlined, size: 16),
+                  label: const Text('Save'),
+                )
+              else
+                Text('Saved',
+                    style: TextStyle(
+                        fontSize: 11, color: Colors.white.withOpacity(0.35))),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            color: const Color(0xFF0F0F14),
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _controller,
+              maxLines: null,
+              expands: true,
+              textAlignVertical: TextAlignVertical.top,
+              onChanged: (_) {
+                if (!_dirty) setState(() => _dirty = true);
+              },
+              style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  height: 1.5,
+                  color: Color(0xFFE0E0E8)),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: '# Ren\'Py script text…',
+                hintStyle: TextStyle(color: Colors.white24),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown at the top of a script file's tab once it's in Raw Mode,
+/// explaining why the visual block editor is unavailable and offering
+/// the only way back (discarding the raw edits -- see
+/// `_DialogueEditorScreenState._discardRawMode`).
+class _RawModeBanner extends StatelessWidget {
+  final VoidCallback onDiscard;
+  const _RawModeBanner({required this.onDiscard});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF0F0F14),
-      padding: const EdgeInsets.all(16),
-      child: SingleChildScrollView(
-        child: SelectableText(
-          script.compile(),
-          style: const TextStyle(
-              fontFamily: 'monospace', fontSize: 13, color: Color(0xFFE0E0E8)),
-        ),
+      color: Colors.amber.withOpacity(0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.amber),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'This file was hand-edited as raw text. Visual Mode is '
+              'unavailable while it\'s in Raw Mode -- edit it below, or '
+              'discard the raw edits to go back to blocks.',
+              style: TextStyle(fontSize: 12.5),
+            ),
+          ),
+          TextButton(
+            onPressed: onDiscard,
+            child: const Text('Discard'),
+          ),
+        ],
       ),
     );
   }

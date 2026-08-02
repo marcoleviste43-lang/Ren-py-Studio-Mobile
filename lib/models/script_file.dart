@@ -16,6 +16,12 @@ class ScriptFile {
     this.rawOverride,
   }) : lines = lines ?? [];
 
+  /// True once this file has been hand-edited (or AI-edited) as raw
+  /// text. While true, `lines` is considered stale -- `compile()` and
+  /// every editor UI must treat `rawOverride` as the sole source of
+  /// truth for this file's content until it's explicitly discarded.
+  bool get isRawMode => rawOverride != null;
+
   /// Compiles this file to final Ren'Py source text.
   ///
   /// Ren'Py labels don't stop at the end of their own content: if a

@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/renpy_project.dart';
+import '../services/ai/ai_action.dart';
+import '../services/ai/ai_action_executor.dart';
 import '../services/ai/ai_provider.dart';
 import '../services/ai_service.dart';
+import '../services/project_service.dart';
+import '../widgets/ai_action_preview_card.dart';
 
 class AiAssistantScreen extends StatefulWidget {
   final RenPyProject project;
@@ -80,6 +84,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
+  final _executor = AiActionExecutor();
+
   Future<void> _send() async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
@@ -91,22 +97,33 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     _inputController.clear();
     setState(() => _error = null);
     try {
-      final context_ = _buildProjectContext();
-      await ai.ask(text, projectContext: context_);
+      await ai.ask(text, project: widget.project);
       _scrollToBottom();
     } catch (e) {
       setState(() => _error = e.toString());
     }
   }
 
-  String _buildProjectContext() {
-    final chars = widget.project.characters
-        .map((c) => '${c.varName}="${c.displayName}"')
-        .join(', ');
-    final scriptNames =
-        widget.project.scripts.map((s) => s.fileName).join(', ');
-    return 'Project "${widget.project.name}". Characters: $chars. '
-        'Script files: $scriptNames.';
+  /// Applies a confirmed AI-proposed script edit, persisting it via
+  /// `ProjectService` and switching the target file to Raw Mode -- the
+  /// only way any AI action ever changes a project.
+  void _applyAction(AiScriptEditAction action) {
+    final ai = context.read<AiService>();
+    try {
+      _executor.apply(widget.project, action, context.read<ProjectService>());
+      ai.dismissAction(action);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Updated '${action.scriptFileName}'.")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not apply change: $e')),
+      );
+    }
+  }
+
+  void _discardAction(AiScriptEditAction action) {
+    context.read<AiService>().dismissAction(action);
   }
 
   void _scrollToBottom() {
@@ -181,7 +198,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                       child: Text(
                         'Ask for scene ideas, character dialogue, branching '
                         'menu logic, or Ren\'Py syntax help. The assistant '
-                        'knows your character list and script files.',
+                        'knows your character list and script files, and can '
+                        'propose edits to an existing file directly -- '
+                        'you\'ll always get a preview to confirm first.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white.withOpacity(0.5)),
                       ),
@@ -223,6 +242,21 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                     },
                   ),
           ),
+          if (ai.pendingActions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  for (final action in ai.pendingActions)
+                    AiActionPreviewCard(
+                      project: widget.project,
+                      action: action,
+                      onApply: () => _applyAction(action),
+                      onDiscard: () => _discardAction(action),
+                    ),
+                ],
+              ),
+            ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
